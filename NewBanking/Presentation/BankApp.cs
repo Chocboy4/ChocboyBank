@@ -1,9 +1,11 @@
-﻿using NewBanking.Banners;
+﻿using NewBanking.BLM;
+using NewBanking.Infrastructure;
+using NewBanking.Presentation.Banners;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace NewBanking
+namespace NewBanking.Presentation
 {
     public class BankApp
     {
@@ -65,9 +67,9 @@ namespace NewBanking
         {
             while (true)
             {
-                Banner.Display($"Welcome to ChocboyBank {branch} branch");
+                Banner.Display($"Welcome to ChocboyBank {branch} branch, {current.Name}");
 
-                Console.WriteLine($"\nWelcome to ChocboyBank {branch} branch, {current.Name}");
+                
 
                 if (current.IsFrozen)
                 {

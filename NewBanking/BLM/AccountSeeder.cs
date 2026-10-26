@@ -1,8 +1,9 @@
-﻿using System;
+﻿using NewBanking.Infrastructure;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace NewBanking
+namespace NewBanking.BLM
 {
     public class AccountSeeder
     {

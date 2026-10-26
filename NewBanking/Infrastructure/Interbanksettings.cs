@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
 
-namespace NewBanking
+namespace NewBanking.Infrastructure
 {
     public static class InterBankSettings
     {

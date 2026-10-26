@@ -1,9 +1,11 @@
-﻿using System;
+﻿using NewBanking.Infrastructure;
+using NewBanking.Presentation;
+using System;
 using System.Collections.Generic;
 using System.IO.Pipelines;
 using System.Text;
 
-namespace NewBanking
+namespace NewBanking.BLM
 {
     public class BankingOperations
     {

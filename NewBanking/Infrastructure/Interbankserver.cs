@@ -1,11 +1,12 @@
-﻿using System;
+﻿using NewBanking.BLM;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Text;
 using System.Text.Json;
 
-namespace NewBanking
+namespace NewBanking.Infrastructure
 {
     public static class InterBankServer
     {
@@ -34,7 +35,7 @@ namespace NewBanking
                 return;
             }
 
-            Console.WriteLine($"Listening for other-bank transfers on port {InterBankSettings.Port}.");
+            //Console.WriteLine($"Listening for other-bank transfers on port {InterBankSettings.Port}.");
 
             Task.Run(() => ListenLoop(listener, accounts));
         }

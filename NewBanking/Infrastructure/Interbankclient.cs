@@ -1,4 +1,5 @@
-﻿using System;
+﻿using NewBanking.BLM;
+using System;
 using System.Collections.Generic;
 using System.IO.Pipelines;
 using System.Net.Http.Json;
@@ -6,7 +7,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 
-namespace NewBanking
+namespace NewBanking.Infrastructure
 {
     public static class InterBankClient
     {

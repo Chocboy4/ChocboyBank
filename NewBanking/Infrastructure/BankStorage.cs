@@ -4,12 +4,13 @@ using System.IO;
 using System.Text.Json;
 
 
-namespace NewBanking
+namespace NewBanking.Infrastructure
 {
     public static class BankStorage
     {
         
         public static readonly object SyncRoot = new();
+
 
         private static readonly string FileName =
             Path.Combine(AppContext.BaseDirectory, "accounts.json");

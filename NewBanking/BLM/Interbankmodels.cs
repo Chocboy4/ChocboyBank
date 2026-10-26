@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace NewBanking
+namespace NewBanking.BLM
 {
     
     public record TransferRequest(

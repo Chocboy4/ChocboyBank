@@ -1,7 +1,6 @@
-﻿
-using System;
+﻿using System;
 
-namespace NewBanking.Banners
+namespace NewBanking.Presentation.Banners
 {
     internal class Banner
     {
