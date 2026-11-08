@@ -32,6 +32,54 @@ namespace NewBanking.BLM
             ConsoleHelper.Pause();
         }
 
+        public bool Deposit(Account current)
+        {
+            Console.Write("Enter amount to deposit: ");
+
+            if (!decimal.TryParse(Console.ReadLine(), out decimal amount) || amount <= 500)
+            {
+                Console.WriteLine("Please enter a valid deposit from 500 and above.");
+                ConsoleHelper.Pause();
+                return true;
+            }
+
+            if (decimal.Round(amount, 2) != amount)
+            {
+                Console.WriteLine("Amount cannot have more than 2 decimal places.");
+                ConsoleHelper.Pause();
+                return true;
+            }
+
+            if (!ConsoleHelper.VerifyPin(current, MaxPinAttempts))
+            {
+                Console.WriteLine("Too many incorrect attempts. You have been logged out.");
+                ConsoleHelper.Pause();
+                return false;
+            }
+
+            lock (BankStorage.SyncRoot)
+            {
+                current.Balance += amount;
+                current.Transactions.Add($"Cash deposit: ₦{amount:N2}");
+
+                try
+                {
+                    BankStorage.SaveAccounts(_accounts);
+                    Console.WriteLine($"\nDeposit successful! Your new balance is ₦{current.Balance:N2}.");
+                }
+                catch (Exception ex)
+                {
+                    current.Balance -= amount;
+                    current.Transactions.RemoveAt(current.Transactions.Count - 1);
+                    Console.WriteLine($"Could not save the deposit: {ex.Message}");
+                    Console.WriteLine("No deposit was made.");
+                }
+            }
+
+            ConsoleHelper.Pause();
+            return true;
+        }
+
         
         private static bool BlockIfFrozen(Account current)
         {
@@ -210,31 +258,167 @@ namespace NewBanking.BLM
                 return true;
             }
 
+            return ProcessOwnBill(current, "airtime", network, phoneNumber, airtimeAmount, null, "airtime");
+        }
+
+        public bool BuyData(Account current)
+        {
+            if (BlockIfFrozen(current))
+            {
+                return true;
+            }
+
+            Console.Write("Choose network (MTN, Airtel, Glo, 9mobile): ");
+            string network = ConsoleHelper.ReadTrimmed();
+
+            bool validNetwork = Array.Exists(
+                ValidNetworks,
+                n => n.Equals(network, StringComparison.OrdinalIgnoreCase));
+
+            if (!validNetwork)
+            {
+                Console.WriteLine("Invalid network.");
+                ConsoleHelper.Pause();
+                return true;
+            }
+
+            Console.Write("Enter phone number: ");
+            string phoneNumber = ConsoleHelper.ReadTrimmed();
+
+            if (phoneNumber.Length != 11 ||
+                !phoneNumber.StartsWith("0") ||
+                !phoneNumber.All(char.IsDigit))
+            {
+                Console.WriteLine("Enter a valid 11-digit Nigerian phone number.");
+                ConsoleHelper.Pause();
+                return true;
+            }
+
+            // ChocboyBank sells the plans, so read its own list directly
+            List<DataPlan> plans = DataPlanCatalog.Plans;
+
+            for (int i = 0; i < plans.Count; i++)
+            {
+                Console.WriteLine($"{i + 1}. {plans[i].Name} - ₦{plans[i].Price:N2}");
+            }
+
+            Console.Write("Select a plan: ");
+
+            if (!int.TryParse(Console.ReadLine(), out int choice) ||
+                choice < 1 || choice > plans.Count)
+            {
+                Console.WriteLine("Invalid selection.");
+                ConsoleHelper.Pause();
+                return true;
+            }
+
+            DataPlan plan = plans[choice - 1];
+
+            if (!ConsoleHelper.VerifyPin(current, MaxPinAttempts))
+            {
+                Console.WriteLine("Too many incorrect attempts. You have been logged out.");
+                ConsoleHelper.Pause();
+                return false;
+            }
+
+            if (plan.Price > current.Balance)
+            {
+                Console.WriteLine("Insufficient funds.");
+                ConsoleHelper.Pause();
+                return true;
+            }
+
+            return ProcessOwnBill(current, "data", network, phoneNumber, plan.Price, plan.Code, $"data ({plan.Name})");
+        }
+
+        
+        private bool ProcessOwnBill(
+            Account current,
+            string type,          
+            string network,
+            string phoneNumber,
+            decimal amount,
+            string? planCode,     
+            string label)         
+        {
+            var request = new BillPurchaseRequest
+            {
+                Reference = "CB-" + Guid.NewGuid().ToString("N"),
+                Type = type,
+                Network = network,
+                PhoneNumber = phoneNumber,
+                Amount = amount,
+                PlanCode = planCode
+            };
+
+            
+            string? problem = BillProcessor.Check(request);
+
+            if (problem != null)
+            {
+                Console.WriteLine($"\nPurchase failed: {problem}");
+                Console.WriteLine("You have not been charged.");
+                ConsoleHelper.Pause();
+                return true;
+            }
+
             lock (BankStorage.SyncRoot)
             {
-                current.Balance -= airtimeAmount;
-
+                
+                current.Balance -= amount;
                 current.Transactions.Add(
-                    $"Purchased airtime for {phoneNumber} on {network}, amount: ₦{airtimeAmount:N2}");
+                    $"Purchased {label} for {phoneNumber} on {network}, amount: ₦{amount:N2}");
+                int entryIndex = current.Transactions.Count - 1;
 
                 try
                 {
                     BankStorage.SaveAccounts(_accounts);
-
-                    Console.WriteLine("\nAirtime purchase successful!");
-                    Console.WriteLine($"Phone number: {phoneNumber}");
-                    Console.WriteLine($"Amount: ₦{airtimeAmount:N2}");
-                    Console.WriteLine($"New balance: ₦{current.Balance:N2}");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Could not save the airtime purchase: {ex.Message}");
+                    current.Balance += amount;
+                    current.Transactions.RemoveAt(entryIndex);
+
+                    Console.WriteLine($"Could not save, so the purchase was cancelled: {ex.Message}");
+                    ConsoleHelper.Pause();
+                    return true;
+                }
+
+                
+                var (_, response) = BillProcessor.Process(request, ownCustomer: true);
+
+                if (response.Success)
+                {
+                    Console.WriteLine($"\nPurchase successful!");
+                    Console.WriteLine($"{label} for {phoneNumber} on {network}");
+                    Console.WriteLine($"Amount: ₦{amount:N2}");
+                    Console.WriteLine($"New balance: ₦{current.Balance:N2}");
+                }
+                else
+                {
+                    
+                    current.Balance += amount;
+                    current.Transactions[entryIndex] =
+                        $"FAILED {label} for {phoneNumber} on {network}, ₦{amount:N2} refunded";
+
+                    try
+                    {
+                        BankStorage.SaveAccounts(_accounts);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Could not save the refund: {ex.Message}");
+                    }
+
+                    Console.WriteLine($"\nPurchase failed: {response.Message}");
+                    Console.WriteLine($"₦{amount:N2} has been refunded. Balance: ₦{current.Balance:N2}");
                 }
             }
 
             ConsoleHelper.Pause();
             return true;
         }
+
 
         private bool TransferToOtherBank(Account current)
         {
@@ -297,6 +481,15 @@ namespace NewBanking.BLM
             string shortRef = transferId[..8];
             string destination = $"{toAccount} at {InterBankSettings.PeerLabel}";
             int entryIndex;
+            var transfer = new TransferRecord
+            {
+                TransferId = transferId,
+                DestinationBank = InterBankSettings.PeerLabel,
+                DestinationAccount = toAccount,
+                Amount = amount,
+                Status = TransferStatuses.Pending,
+                CreatedAtUtc = DateTime.UtcNow
+            };
 
             
             lock (BankStorage.SyncRoot)
@@ -304,6 +497,7 @@ namespace NewBanking.BLM
                 current.Balance -= amount;
                 current.Transactions.Add($"PENDING: sending ₦{amount:N2} to {destination} (ref {shortRef})");
                 entryIndex = current.Transactions.Count - 1;
+                current.Transfers.Add(transfer);
 
                 try
                 {
@@ -313,6 +507,7 @@ namespace NewBanking.BLM
                 {
                     current.Balance += amount;
                     current.Transactions.RemoveAt(entryIndex);
+                    current.Transfers.Remove(transfer);
 
                     Console.WriteLine($"Could not save, so the transfer was cancelled: {ex.Message}");
                     ConsoleHelper.Pause();
@@ -336,6 +531,7 @@ namespace NewBanking.BLM
                     case SendOutcome.Delivered:
                         current.Transactions[entryIndex] =
                             $"Transferred ₦{amount:N2} to {destination} (ref {shortRef})";
+                        transfer.Status = TransferStatuses.Completed;
 
                         Console.WriteLine($"\nTransfer successful! You sent ₦{amount:N2} to {destination}.");
                         Console.WriteLine($"Your new balance is ₦{current.Balance:N2}.");
@@ -347,6 +543,9 @@ namespace NewBanking.BLM
                         current.Balance += amount;
                         current.Transactions[entryIndex] =
                             $"FAILED: ₦{amount:N2} to {destination} was not sent and was refunded (ref {shortRef})";
+                        transfer.Status = TransferStatuses.Refunded;
+                        transfer.ResolvedAtUtc = DateTime.UtcNow;
+                        transfer.Resolution = "Automatically refunded because the transfer was not delivered.";
 
                         Console.WriteLine($"\nTransfer failed: {result.Message}");
                         Console.WriteLine("Your money has been returned to your account.");
@@ -356,6 +555,7 @@ namespace NewBanking.BLM
                         
                         current.Transactions[entryIndex] =
                             $"UNCONFIRMED: ₦{amount:N2} to {destination}, the other bank did not confirm (ref {shortRef})";
+                        transfer.Status = TransferStatuses.Unconfirmed;
 
                         Console.WriteLine($"\n{result.Message}");
                         Console.WriteLine("The other bank did not confirm the transfer.");

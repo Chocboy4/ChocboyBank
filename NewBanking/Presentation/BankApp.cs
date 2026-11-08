@@ -68,6 +68,7 @@ namespace NewBanking.Presentation
             while (true)
             {
                 Banner.Display($"Welcome to ChocboyBank {branch} branch, {current.Name}");
+                Console.WriteLine($"Account number: {current.AccountNumber}");
 
                 
 
@@ -78,11 +79,13 @@ namespace NewBanking.Presentation
 
                 Console.WriteLine("\n1. Check balance");
                 Console.WriteLine("2. Transfer");
-                Console.WriteLine("3. Airtime");
-                Console.WriteLine("4. Transactions");
-                Console.WriteLine("5. Change PIN");
-                Console.WriteLine("6. Logout");
-                Console.WriteLine("7. Exit");
+                Console.WriteLine("3. Deposit");
+                Console.WriteLine("4. Airtime");
+                Console.WriteLine("5. Data");
+                Console.WriteLine("6. Transactions");
+                Console.WriteLine("7. Change PIN");
+                Console.WriteLine("8. Logout");
+                Console.WriteLine("9. Exit");
                 Console.Write("\nChoose an option: ");
 
                 string choice = Console.ReadLine() ?? "";
@@ -98,27 +101,34 @@ namespace NewBanking.Presentation
                         break;
 
                     case "3":
-                        if (!operations.BuyAirtime(current)) return false;
+                        if (!operations.Deposit(current)) return false;
                         break;
 
                     case "4":
-                        operations.ShowTransactions(current);
+                        if (!operations.BuyAirtime(current)) return false;
                         break;
-
                     case "5":
-                        if (!operations.ChangePin(current)) return false;
+                        if (!operations.BuyData(current)) return false;
                         break;
 
                     case "6":
+                        operations.ShowTransactions(current);
+                        break;
+
+                    case "7":
+                        if (!operations.ChangePin(current)) return false;
+                        break;
+
+                    case "8":
                         Console.WriteLine($"\nGoodbye, {current.Name}! You have been logged out.");
                         return false;
 
-                    case "7":
+                    case "9":
                         Console.WriteLine("Thank you for using ChocboyBank!");
                         return true;
 
                     default:
-                        Console.WriteLine("Invalid option. Please choose 1 to 7.");
+                        Console.WriteLine("Invalid option. Please choose 1 to 9.");
                         ConsoleHelper.Pause();
                         break;
                 }
@@ -137,9 +147,11 @@ namespace NewBanking.Presentation
                 Console.WriteLine("2. Freeze an account");
                 Console.WriteLine("3. Unfreeze an account");
                 Console.WriteLine("4. View an account's transactions");
-                Console.WriteLine("5. Change PIN");
-                Console.WriteLine("6. Logout");
-                Console.WriteLine("7. Exit");
+                Console.WriteLine("5. Deposit into a customer account");
+                Console.WriteLine("6. Resolve unconfirmed transfers");
+                Console.WriteLine("7. Change PIN");
+                Console.WriteLine("8. Logout");
+                Console.WriteLine("9. Exit");
                 Console.Write("\nChoose an option: ");
 
                 string choice = Console.ReadLine() ?? "";
@@ -163,19 +175,27 @@ namespace NewBanking.Presentation
                         break;
 
                     case "5":
-                        if (!adminOperations.ChangePin(admin)) return false;
+                        if (!adminOperations.DepositToCustomer(admin)) return false;
                         break;
 
                     case "6":
+                        if (!adminOperations.ResolveUnconfirmedTransfers(admin)) return false;
+                        break;
+
+                    case "7":
+                        if (!adminOperations.ChangePin(admin)) return false;
+                        break;
+
+                    case "8":
                         Console.WriteLine($"\nGoodbye, {admin.Name}! You have been logged out.");
                         return false;
 
-                    case "7":
+                    case "9":
                         Console.WriteLine("Thank you for using ChocboyBank!");
                         return true;
 
                     default:
-                        Console.WriteLine("Invalid option. Please choose 1 to 7.");
+                        Console.WriteLine("Invalid option. Please choose 1 to 9.");
                         ConsoleHelper.Pause();
                         break;
                 }

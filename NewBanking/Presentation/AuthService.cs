@@ -1,4 +1,5 @@
 ﻿using NewBanking.Infrastructure;
+using NewBanking.BLM;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -8,6 +9,7 @@ namespace NewBanking.Presentation
     public class AuthService
     {
         private const int MaxAttempts = 3;
+        private const decimal MinimumOpeningDeposit = 2000m;
         private readonly List<Account> _accounts;
 
         public AuthService(List<Account> accounts)
@@ -22,11 +24,17 @@ namespace NewBanking.Presentation
 
             while (current == null)
             {
-                Console.Write("Enter the name on your account: ");
-                string userName = ConsoleHelper.ReadTrimmed();
+                Console.Write("Enter your account name or account number: ");
+                string loginValue = ConsoleHelper.ReadTrimmed();
+                if (string.IsNullOrWhiteSpace(loginValue))
+                {
+                    Console.WriteLine("Input cannot be empty. Please try again.\n");
+                    continue;
+                }
 
                 current = _accounts.Find(
-                    a => a.Name.Equals(userName, StringComparison.OrdinalIgnoreCase));
+                    a => a.Name.Equals(loginValue, StringComparison.OrdinalIgnoreCase) ||
+                         a.AccountNumber == loginValue);
 
                 if (current != null)
                 {
@@ -98,17 +106,48 @@ namespace NewBanking.Presentation
                 return null;
             }
 
+            Console.Write($"Enter your opening deposit (minimum ₦{MinimumOpeningDeposit:N2}): ");
+            if (!decimal.TryParse(Console.ReadLine(), out decimal openingDeposit) ||
+                openingDeposit < MinimumOpeningDeposit)
+            {
+                Console.WriteLine($"An opening deposit of at least ₦{MinimumOpeningDeposit:N2} is required. Account was not created.\n");
+                return null;
+            }
+
+            if (decimal.Round(openingDeposit, 2) != openingDeposit)
+            {
+                Console.WriteLine("Opening deposit cannot have more than 2 decimal places. Account was not created.\n");
+                return null;
+            }
+
             var account = new Account
             {
                 Name = newName,
+                AccountNumber = AccountNumberGenerator.CreateUnique(_accounts),
                 Pin = newPin,
-                Balance = 0m
+                Balance = openingDeposit
             };
 
-            _accounts.Add(account);
-            BankStorage.SaveAccounts(_accounts);
+            account.Transactions.Add($"Opening deposit: ₦{openingDeposit:N2}");
 
-            Console.WriteLine($"Account created for {account.Name}.\n");
+            lock (BankStorage.SyncRoot)
+            {
+                _accounts.Add(account);
+
+                try
+                {
+                    BankStorage.SaveAccounts(_accounts);
+                }
+                catch (Exception ex)
+                {
+                    _accounts.Remove(account);
+                    Console.WriteLine($"Could not create the account: {ex.Message}\n");
+                    return null;
+                }
+            }
+
+            Console.WriteLine($"Account created for {account.Name}.");
+            Console.WriteLine($"Your account number is: {account.AccountNumber}\n");
             return account;
         }
     }

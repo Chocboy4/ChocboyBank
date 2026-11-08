@@ -10,7 +10,7 @@ namespace NewBanking.Infrastructure
 {
     public static class InterBankServer
     {
-        
+
         private static readonly HashSet<string> Processed = new();
 
         public static void Start(List<Account> accounts)
@@ -40,7 +40,7 @@ namespace NewBanking.Infrastructure
             Task.Run(() => ListenLoop(listener, accounts));
         }
 
-        private static async Task  ListenLoop(HttpListener listener, List<Account> accounts)
+        private static async Task ListenLoop(HttpListener listener, List<Account> accounts)
         {
             while (listener.IsListening)
             {
@@ -75,17 +75,22 @@ namespace NewBanking.Infrastructure
                 }
                 catch (Exception)
                 {
-                    
+
                 }
             }
         }
 
-        private static (int Status, TransferResponse Response) Route(
+        private static (int Status, object Body) Route(
             HttpListenerContext context, List<Account> accounts)
         {
             HttpListenerRequest req = context.Request;
+            string? path = req.Url?.AbsolutePath;
 
-            if (req.HttpMethod != "POST" || req.Url?.AbsolutePath != "/api/transfers/incoming")
+            bool isTransfer = req.HttpMethod == "POST" && path == "/api/transfers/incoming";
+            bool isPurchase = req.HttpMethod == "POST" && path == "/api/bills/purchase";
+            bool isPlans = req.HttpMethod == "GET" && path == "/api/bills/data-plans";
+
+            if (!isTransfer && !isPurchase && !isPlans)
             {
                 return (404, new TransferResponse(false, "Not found."));
             }
@@ -95,12 +100,32 @@ namespace NewBanking.Infrastructure
                 return (401, new TransferResponse(false, "Invalid API key."));
             }
 
+            // List the data plans ChocboyBank sells
+            if (isPlans)
+            {
+                return (200, DataPlanCatalog.Plans);
+            }
+
+            string body;
+
+            using (var reader = new StreamReader(req.InputStream, req.ContentEncoding))
+            {
+                body = reader.ReadToEnd();
+            }
+
+            // Buy airtime / data (request from the other bank)
+            if (isPurchase)
+            {
+                return Purchase(body);
+            }
+
+            // ----- existing transfer logic below, unchanged -----
+
             TransferRequest? request;
 
             try
             {
-                using var reader = new StreamReader(req.InputStream, req.ContentEncoding);
-                request = JsonSerializer.Deserialize<TransferRequest>(reader.ReadToEnd(), InterBankSettings.Json);
+                request = JsonSerializer.Deserialize<TransferRequest>(body, InterBankSettings.Json);
             }
             catch (JsonException)
             {
@@ -113,6 +138,29 @@ namespace NewBanking.Infrastructure
             }
 
             return Credit(request, accounts);
+        }
+
+        // CHANGED: all checking and recording now lives in BillProcessor,
+        // which ChocboyBank's own customers use too.
+        private static (int Status, TransferResponse Response) Purchase(string body)
+        {
+            BillPurchaseRequest? request;
+
+            try
+            {
+                request = JsonSerializer.Deserialize<BillPurchaseRequest>(body, InterBankSettings.Json);
+            }
+            catch (JsonException)
+            {
+                return (400, new TransferResponse(false, "Request body is not valid JSON."));
+            }
+
+            if (request == null)
+            {
+                return (400, new TransferResponse(false, "Empty request."));
+            }
+
+            return BillProcessor.Process(request, ownCustomer: false);
         }
 
         private static (int Status, TransferResponse Response) Credit(
@@ -137,7 +185,7 @@ namespace NewBanking.Infrastructure
                     return (200, new TransferResponse(true, "Already processed."));
                 }
 
-                
+
                 Account? recipient = accounts.Find(a =>
                     !a.IsAdmin &&
                     a.Name.Equals(request.ToAccount.Trim(), StringComparison.OrdinalIgnoreCase));
@@ -169,9 +217,9 @@ namespace NewBanking.Infrastructure
 
         private static string ShortRef(string id) => id.Length > 8 ? id[..8] : id;
 
-        private static void Write(HttpListenerContext context, int status, TransferResponse response)
+        private static void Write(HttpListenerContext context, int status, object body)
         {
-            byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(response, InterBankSettings.Json);
+            byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(body, body.GetType(), InterBankSettings.Json);
 
             context.Response.StatusCode = status;
             context.Response.ContentType = "application/json";

@@ -28,6 +28,12 @@ namespace NewBanking.BLM
                     acc.Pin = DefaultPins.GetValueOrDefault(acc.Name.ToLower(), "0000");
                     updated = true;
                 }
+
+                if (!acc.IsAdmin && string.IsNullOrWhiteSpace(acc.AccountNumber))
+                {
+                    acc.AccountNumber = AccountNumberGenerator.CreateUnique(accounts);
+                    updated = true;
+                }
             }
 
             if (accounts.Count == 0)
@@ -39,6 +45,11 @@ namespace NewBanking.BLM
                     new Account { Name = "brian", Pin = "9012", Balance = 250000m },
                     new Account { Name = "Peter", Pin = "3456", Balance = 7500000m }
                 });
+
+                foreach (var account in accounts)
+                {
+                    account.AccountNumber = AccountNumberGenerator.CreateUnique(accounts);
+                }
 
                 updated = true;
             }
