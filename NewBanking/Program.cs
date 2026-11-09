@@ -4,8 +4,6 @@ using NewBanking.Presentation.Banners;
 
 
 InterBankSettings.Configure(args);
-Console.WriteLine("=================================================================");
-Console.WriteLine($"Welcome to ChocboyBank");
-Console.WriteLine("=================================================================");
+ConsoleUI.Banner("Welcome to ChocboyBank");
 
 new BankApp().Run();

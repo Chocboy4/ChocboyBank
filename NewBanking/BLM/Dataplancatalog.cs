@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace NewBanking.BLM
 {
-    // ChocboyBank owns the list of what it sells and at what price.
+   
     public static class DataPlanCatalog
     {
         private static readonly string[] Networks =

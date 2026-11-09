@@ -23,7 +23,7 @@ namespace NewBanking.Presentation
             }
 
             Console.Write("Enter your new 4-digit PIN: ");
-            string newPin = ConsoleHelper.ReadTrimmed();
+            string newPin = ConsoleHelper.ReadPin();
 
             if (!IsValidPin(newPin))
             {
@@ -40,7 +40,7 @@ namespace NewBanking.Presentation
             }
 
             Console.Write("Confirm your new PIN: ");
-            string confirmPin = ConsoleHelper.ReadTrimmed();
+            string confirmPin = ConsoleHelper.ReadPin();
 
             if (confirmPin != newPin)
             {

@@ -100,7 +100,7 @@ namespace NewBanking.Infrastructure
                 return (401, new TransferResponse(false, "Invalid API key."));
             }
 
-            // List the data plans ChocboyBank sells
+            
             if (isPlans)
             {
                 return (200, DataPlanCatalog.Plans);
@@ -113,13 +113,13 @@ namespace NewBanking.Infrastructure
                 body = reader.ReadToEnd();
             }
 
-            // Buy airtime / data (request from the other bank)
+            
             if (isPurchase)
             {
                 return Purchase(body);
             }
 
-            // ----- existing transfer logic below, unchanged -----
+            
 
             TransferRequest? request;
 
@@ -140,8 +140,7 @@ namespace NewBanking.Infrastructure
             return Credit(request, accounts);
         }
 
-        // CHANGED: all checking and recording now lives in BillProcessor,
-        // which ChocboyBank's own customers use too.
+        
         private static (int Status, TransferResponse Response) Purchase(string body)
         {
             BillPurchaseRequest? request;
@@ -180,7 +179,8 @@ namespace NewBanking.Infrastructure
 
             lock (BankStorage.SyncRoot)
             {
-                if (Processed.Contains(request.TransferId))
+                
+                if (accounts.Any(a => a.ReceivedTransferIds.Contains(request.TransferId)))
                 {
                     return (200, new TransferResponse(true, "Already processed."));
                 }
@@ -198,6 +198,7 @@ namespace NewBanking.Infrastructure
                 recipient.Balance += request.Amount;
                 recipient.Transactions.Add(
                     $"Received ₦{request.Amount:N2} from {request.FromAccount} at {request.FromBank} (ref {ShortRef(request.TransferId)})");
+                recipient.ReceivedTransferIds.Add(request.TransferId);
 
                 try
                 {
@@ -207,10 +208,10 @@ namespace NewBanking.Infrastructure
                 {
                     recipient.Balance -= request.Amount;
                     recipient.Transactions.RemoveAt(recipient.Transactions.Count - 1);
+                    recipient.ReceivedTransferIds.Remove(request.TransferId);
                     return (500, new TransferResponse(false, "Could not save the transfer."));
                 }
 
-                Processed.Add(request.TransferId);
                 return (200, new TransferResponse(true, "Transfer received."));
             }
         }

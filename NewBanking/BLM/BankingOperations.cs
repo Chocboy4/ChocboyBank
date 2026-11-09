@@ -22,15 +22,16 @@ namespace NewBanking.BLM
 
         public void CheckBalance(Account current)
         {
-            Console.WriteLine($"\nYour balance is: ₦{current.Balance:N2}");
+            ConsoleUI.BalanceCard(current.Name, current.Balance);
 
             if (current.IsFrozen)
             {
-                Console.WriteLine("Account status: FROZEN (you can receive money but not send it).");
+                ConsoleUI.Warning("Account status: FROZEN (you can receive money but not send it).");
             }
 
             ConsoleHelper.Pause();
         }
+
 
         public bool Deposit(Account current)
         {
@@ -38,7 +39,7 @@ namespace NewBanking.BLM
 
             if (!decimal.TryParse(Console.ReadLine(), out decimal amount) || amount <= 500)
             {
-                Console.WriteLine("Please enter a valid deposit from 500 and above.");
+                ConsoleUI.Warning("Please enter a valid deposit from 500 and above.");
                 ConsoleHelper.Pause();
                 return true;
             }
@@ -52,7 +53,7 @@ namespace NewBanking.BLM
 
             if (!ConsoleHelper.VerifyPin(current, MaxPinAttempts))
             {
-                Console.WriteLine("Too many incorrect attempts. You have been logged out.");
+                ConsoleUI.Error("Too many incorrect attempts. You have been logged out.");
                 ConsoleHelper.Pause();
                 return false;
             }
@@ -60,12 +61,12 @@ namespace NewBanking.BLM
             lock (BankStorage.SyncRoot)
             {
                 current.Balance += amount;
-                current.Transactions.Add($"Cash deposit: ₦{amount:N2}");
+                current.Transactions.Add($"You Deposited ₦{amount:N2}");
 
                 try
                 {
                     BankStorage.SaveAccounts(_accounts);
-                    Console.WriteLine($"\nDeposit successful! Your new balance is ₦{current.Balance:N2}.");
+                    ConsoleUI.Success($"\nDeposit successful! Your new balance is ₦{current.Balance:N2}.");
                 }
                 catch (Exception ex)
                 {
@@ -81,6 +82,7 @@ namespace NewBanking.BLM
         }
 
         
+
         private static bool BlockIfFrozen(Account current)
         {
             if (!current.IsFrozen)
@@ -88,8 +90,8 @@ namespace NewBanking.BLM
                 return false;
             }
 
-            Console.WriteLine("\nYour account is frozen. You cannot send money or buy airtime.");
-            Console.WriteLine("You can still receive money. Please contact the bank for help.");
+            ConsoleUI.Warning("\nYour account is frozen. You cannot send money or buy airtime.");
+            ConsoleUI.Warning("You can still receive money. Please contact the bank for help.");
             ConsoleHelper.Pause();
             return true;
         }
@@ -102,7 +104,7 @@ namespace NewBanking.BLM
             }
 
             Console.WriteLine("\n1. Same bank");
-            Console.WriteLine("2. Another bank");
+            Console.WriteLine("2. TatumBank");
             Console.Write("Choose transfer type: ");
 
             string type = ConsoleHelper.ReadTrimmed();
@@ -110,7 +112,7 @@ namespace NewBanking.BLM
             if (type == "1") return TransferLocal(current);
             if (type == "2") return TransferToOtherBank(current);
 
-            Console.WriteLine("Invalid option.");
+            ConsoleUI.Warning("Invalid option.");
             ConsoleHelper.Pause();
             return true;
         }
@@ -126,14 +128,14 @@ namespace NewBanking.BLM
 
             if (recipient == null)
             {
-                Console.WriteLine("Recipient account not found.");
+                ConsoleUI.Error("Recipient account not found.");
                 ConsoleHelper.Pause();
                 return true;
             }
 
             if (recipient == current)
             {
-                Console.WriteLine("You cannot transfer money to yourself.");
+                ConsoleUI.Error("You cannot transfer money to yourself.");
                 ConsoleHelper.Pause();
                 return true;
             }
@@ -142,28 +144,28 @@ namespace NewBanking.BLM
 
             if (!decimal.TryParse(Console.ReadLine(), out decimal amount))
             {
-                Console.WriteLine("Please enter a valid amount.");
+                ConsoleUI.Warning("Please enter a valid amount.");
                 ConsoleHelper.Pause();
                 return true;
             }
 
             if (amount <= 50)
             {
-                Console.WriteLine("Amount must be greater than fifty naira.");
+                ConsoleUI.Warning("Amount must be greater than fifty naira.");
                 ConsoleHelper.Pause();
                 return true;
             }
 
             if (amount > current.Balance)
             {
-                Console.WriteLine("Insufficient funds.");
+                ConsoleUI.Warning("Insufficient funds.");
                 ConsoleHelper.Pause();
                 return true;
             }
 
             if (!ConsoleHelper.VerifyPin(current, MaxPinAttempts))
             {
-                Console.WriteLine("Too many incorrect attempts. You have been logged out.");
+                ConsoleUI.Error("Too many incorrect attempts. You have been logged out.");
                 ConsoleHelper.Pause();
                 return false;
             }
@@ -180,9 +182,9 @@ namespace NewBanking.BLM
                 {
                     BankStorage.SaveAccounts(_accounts);
 
-                    Console.WriteLine(
+                    ConsoleUI.Success(
                         $"\nTransfer successful! You sent ₦{amount:N2} to {recipient.Name}.");
-                    Console.WriteLine($"Your new balance is {current.Balance:N2}.");
+                    ConsoleUI.BalanceCard(current.Name, current.Balance);
                 }
                 catch (Exception ex)
                 {
@@ -202,7 +204,7 @@ namespace NewBanking.BLM
                 return true;
             }
 
-            Console.Write("Choose network (MTN, Airtel, Glo, 9mobile): ");
+            ConsoleUI.Prompt("Choose network (MTN, Airtel, Glo, 9mobile): ");
             string network = ConsoleHelper.ReadTrimmed();
 
             bool validNetwork = Array.Exists(
@@ -223,7 +225,7 @@ namespace NewBanking.BLM
                 !phoneNumber.StartsWith("0") ||
                 !phoneNumber.All(char.IsDigit))
             {
-                Console.WriteLine("Enter a valid 11-digit Nigerian phone number.");
+                ConsoleUI.Prompt("Enter a valid 11-digit Nigerian phone number.");
                 ConsoleHelper.Pause();
                 return true;
             }
@@ -232,21 +234,21 @@ namespace NewBanking.BLM
 
             if (!decimal.TryParse(Console.ReadLine(), out decimal airtimeAmount))
             {
-                Console.WriteLine("Please enter a valid amount.");
+                ConsoleUI.Prompt("Please enter a valid amount.");
                 ConsoleHelper.Pause();
                 return true;
             }
 
             if (airtimeAmount <= 50)
             {
-                Console.WriteLine("Amount must be greater than Fourty nine Naira.");
+                ConsoleUI.Warning("Amount must be greater than Fourty nine Naira.");
                 ConsoleHelper.Pause();
                 return true;
             }
 
             if (!ConsoleHelper.VerifyPin(current, MaxPinAttempts))
             {
-                Console.WriteLine("Too many incorrect attempts. You have been logged out.");
+                ConsoleUI.Error("Too many incorrect attempts. You have been logged out.");
                 ConsoleHelper.Pause();
                 return false;
             }
@@ -268,7 +270,7 @@ namespace NewBanking.BLM
                 return true;
             }
 
-            Console.Write("Choose network (MTN, Airtel, Glo, 9mobile): ");
+            ConsoleUI.Prompt("Choose network (MTN, Airtel, Glo, 9mobile): ");
             string network = ConsoleHelper.ReadTrimmed();
 
             bool validNetwork = Array.Exists(
@@ -277,12 +279,12 @@ namespace NewBanking.BLM
 
             if (!validNetwork)
             {
-                Console.WriteLine("Invalid network.");
+                ConsoleUI.Error("Invalid network.");
                 ConsoleHelper.Pause();
                 return true;
             }
 
-            Console.Write("Enter phone number: ");
+            ConsoleUI.Prompt("Enter phone number: ");
             string phoneNumber = ConsoleHelper.ReadTrimmed();
 
             if (phoneNumber.Length != 11 ||
@@ -302,7 +304,7 @@ namespace NewBanking.BLM
                 Console.WriteLine($"{i + 1}. {plans[i].Name} - ₦{plans[i].Price:N2}");
             }
 
-            Console.Write("Select a plan: ");
+            ConsoleUI.Prompt("Select a plan: ");
 
             if (!int.TryParse(Console.ReadLine(), out int choice) ||
                 choice < 1 || choice > plans.Count)
@@ -424,8 +426,8 @@ namespace NewBanking.BLM
         {
             if (!InterBankSettings.Enabled)
             {
-                Console.WriteLine("\nOther-bank transfers are not set up.");
-                Console.WriteLine("Start the app with: dotnet run -- <your-port> <other-bank-url>");
+                ConsoleUI.Error("\nOther-bank transfers are not set up.");
+                ConsoleUI.Info("Start the app with: dotnet run -- <your-port> <other-bank-url>");
                 ConsoleHelper.Pause();
                 return true;
             }
@@ -435,44 +437,44 @@ namespace NewBanking.BLM
 
             if (string.IsNullOrWhiteSpace(toAccount))
             {
-                Console.WriteLine("Account name cannot be empty.");
+                ConsoleUI.Error("Account name cannot be empty.");
                 ConsoleHelper.Pause();
                 return true;
             }
 
-            Console.Write("Enter amount to transfer: ");
+            ConsoleUI.Prompt("Enter amount to transfer: ");
 
             if (!decimal.TryParse(Console.ReadLine(), out decimal amount))
             {
-                Console.WriteLine("Please enter a valid amount.");
+                ConsoleUI.Warning("Please enter a valid amount.");
                 ConsoleHelper.Pause();
                 return true;
             }
 
             if (amount <= 50)
             {
-                Console.WriteLine("Amount must be greater than fifty naira.");
+                ConsoleUI.Error("Amount must be greater than fifty naira.");
                 ConsoleHelper.Pause();
                 return true;
             }
 
             if (decimal.Round(amount, 2) != amount)
             {
-                Console.WriteLine("Amount cannot have more than 2 decimal places.");
+                ConsoleUI.Warning("Amount cannot have more than 2 decimal places.");
                 ConsoleHelper.Pause();
                 return true;
             }
 
             if (amount > current.Balance)
             {
-                Console.WriteLine("Insufficient funds.");
+                ConsoleUI.Error("Insufficient funds.");
                 ConsoleHelper.Pause();
                 return true;
             }
 
             if (!ConsoleHelper.VerifyPin(current, MaxPinAttempts))
             {
-                Console.WriteLine("Too many incorrect attempts. You have been logged out.");
+                ConsoleUI.Error("Too many incorrect attempts. You have been logged out.");
                 ConsoleHelper.Pause();
                 return false;
             }
@@ -516,7 +518,7 @@ namespace NewBanking.BLM
             }
 
             
-            Console.WriteLine("\nContacting the other bank...");
+            ConsoleUI.Loading("\nContacting the other bank...");
 
             var request = new TransferRequest(
                 transferId, InterBankSettings.BankName, current.Name, toAccount, amount);
@@ -586,7 +588,7 @@ namespace NewBanking.BLM
 
         public void ShowTransactions(Account current)
         {
-            Console.WriteLine($"\n{current.Name}'s Transaction History");
+            ConsoleUI.Info($"\n{current.Name}'s Transaction History");
 
             if (current.Transactions.Count == 0)
             {
